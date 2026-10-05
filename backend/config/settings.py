@@ -136,6 +136,9 @@ CORS_ALLOWED_ORIGINS = env_list(
 )
 # Optional regex, e.g. r"^https://.*\.vercel\.app$" for Vercel preview deploys.
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES")
+if DEBUG:
+    # Local dev servers may run on any port.
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r"^http://(localhost|127\.0\.0\.1)(:\d+)?$")
 CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", default=False)
 
 # --------------------------------------------------------------------------- #
