@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: #eef1f6;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Glass panel ---------- */
+.glass {
+  background: rgb(255 255 255 / 0.82);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  box-shadow: 0 20px 50px -20px rgb(15 23 42 / 0.35), 0 1px 0 rgb(255 255 255 / 0.6) inset;
+}
+
+/* Thin, unobtrusive scrollbars for the floating panel */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.5) transparent;
+}
+
+/* ---------- Skeleton shimmer ---------- */
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 40%, #e2e8f0 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ---------- Leaflet customisation ---------- */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #dfe6ee;
+}
+/* Soften OSM's default palette so routes and markers stand out. */
+.osm-tiles {
+  filter: saturate(0.75) contrast(0.95) brightness(1.03);
+}
+.leaflet-container.picking {
+  cursor: crosshair;
+}
+.stop-icon {
+  background: transparent;
+  border: none;
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow: 0 12px 30px -10px rgb(15 23 42 / 0.35);
+}
+.leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+/* ---------- Range input ---------- */
+input[type="range"].cycle-range {
+  accent-color: #4f46e5;
+}
+
+/* ---------- Print: only the log sheets, one day per page ---------- */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0.35in;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .log-page {
+    break-after: page;
+    page-break-after: always;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .log-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

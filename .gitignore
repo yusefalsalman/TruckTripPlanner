@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+db.sqlite3
+backend/staticfiles/
+.env
+
+# Node
+node_modules/
+dist/
+.vercel/
+*.local
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local Claude Code preview config
+.claude/
