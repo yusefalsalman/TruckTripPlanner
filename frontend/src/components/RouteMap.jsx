@@ -97,7 +97,7 @@ function AutoFit({ geometry, points, planKey }) {
 function FocusStop({ stop }) {
   const map = useMap()
   useEffect(() => {
-    if (stop) map.flyTo([stop.lat, stop.lon], Math.max(map.getZoom(), 10), { duration: 0.8 })
+    if (stop) map.flyTo([stop.lat, stop.lon], stop.zoom ?? Math.max(map.getZoom(), 10), { duration: 0.8 })
   }, [map, stop])
   return null
 }

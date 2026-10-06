@@ -3,6 +3,7 @@
 Plan a property-carrying truck trip (current → pickup → dropoff) and get:
 
 - an **interactive route map** (OpenStreetMap + Leaflet + OSRM) with markers for the start, pickup, 30-min breaks, 10-hr sleeper rests, fuel stops, 34-hr restarts and dropoff;
+- **turn-by-turn route instructions** for each leg (e.g. "Take exit 42 toward I-135"), with the planned breaks, rests and fuel stops slotted in at the mile they happen;
 - **FMCSA Driver's Daily Log sheets**, one per calendar day, with the 24-hour duty-status graph, remarks (City, ST at every status change), per-status totals that sum to exactly 24.00 h, and a 70-hr / 8-day recap. You can page through the days and print or save the sheets as PDF.
 
 ```
@@ -12,7 +13,7 @@ TruckTripPlanner/
 │   └── trips/
 │       ├── services/
 │       │   ├── hos_scheduler.py HOS engine + day splitter + independent validator (pure Python)
-│       │   ├── routing.py       OSRM client, per-leg distances, point-at-mile interpolation
+│       │   ├── routing.py       OSRM client, turn-by-turn text, point-at-mile interpolation
 │       │   ├── geocoding.py     Nominatim search/reverse, cached + 1 req/s throttle
 │       │   └── trip_planner.py  orchestration → API payload (stops, logs, summary)
 │       ├── models.py            TripPlan (persisted result, shareable by id)
@@ -22,7 +23,8 @@ TruckTripPlanner/
 │   └── src/components/
 │       ├── TripForm.jsx         search / map-pick / drag pins, cycle + departure inputs
 │       ├── RouteMap.jsx         route polyline, stop markers, popups, auto-fit, pick mode
-│       ├── TripSummary.jsx      compliance badge, stats, cycle bar, itinerary
+│       ├── TripSummary.jsx      compliance badge, stats, cycle bar, itinerary / directions tabs
+│       ├── Directions.jsx       turn-by-turn instructions with HOS stops interleaved
 │       ├── LogBook.jsx          day pagination, driver/carrier details, print
 │       ├── LogSheet.jsx         full paper-style daily log page
 │       └── LogSheetGrid.jsx     SVG 24-hour duty-status grid
@@ -40,7 +42,7 @@ python -m venv .venv
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver        # http://localhost:8000
-python manage.py test trips       # 41 tests
+python manage.py test trips       # 45 tests
 ```
 
 **Frontend** (Node 20.19+):
@@ -67,7 +69,7 @@ Click **Sample** to fill in a Dallas → Oklahoma City → Denver trip, then **P
 }
 ```
 
-Each location can be given as coordinates (from a map click or a picked search result), as `{"query": ...}`, or as a plain string. The response (`201`) contains `locations`, `route` (geometry and legs), `stops`, `logs` (one entry per day, with segments, totals, remarks and recap) and `summary` (miles, hours, counts, `compliant`, `violations`). The plan is also saved, so `GET /api/trips/<id>/` re-opens it; the UI keeps that id in `?trip=` so you can share the link.
+Each location can be given as coordinates (from a map click or a picked search result), as `{"query": ...}`, or as a plain string. The response (`201`) contains `locations`, `route` (geometry and legs, each with turn-by-turn `steps`), `stops`, `logs` (one entry per day, with segments, totals, remarks and recap) and `summary` (miles, hours, counts, `compliant`, `violations`). The plan is also saved, so `GET /api/trips/<id>/` re-opens it; the UI keeps that id in `?trip=` so you can share the link.
 
 Helper endpoints used by the form: `GET /api/geocode/search/?q=`, `GET /api/geocode/reverse/?lat=&lon=`, `GET /api/health/`.
 

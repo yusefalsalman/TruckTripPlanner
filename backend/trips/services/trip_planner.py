@@ -84,6 +84,21 @@ class _Labeler:
         return text
 
 
+def _steps_payload(leg: routing.RouteLeg, start_mile: float) -> list[dict]:
+    """Turn-by-turn steps with the route mile at which each maneuver happens."""
+    out, mile = [], start_mile
+    for step in leg.steps:
+        out.append({
+            "instruction": step.instruction, "road": step.road,
+            "maneuver": step.maneuver, "modifier": step.modifier,
+            "mile": round(mile, 1), "distance_miles": round(step.miles, 1),
+            "duration_minutes": round(step.seconds / 60),
+            "lat": round(step.lat, 6), "lon": round(step.lon, 6),
+        })
+        mile += step.miles
+    return out
+
+
 def resolve_location(data: dict) -> Place:
     """Accept either coordinates (+ optional label) or a free-text query."""
     if data.get("lat") is not None and data.get("lon") is not None:
@@ -99,9 +114,10 @@ def resolve_location(data: dict) -> Place:
 def plan_trip(current: Place, pickup: Place, dropoff: Place,
               cycle_used_hours: float, start_time: datetime) -> dict:
     # ---- 1. Route ------------------------------------------------------------
-    route = routing.get_route([(current.lat, current.lon),
-                               (pickup.lat, pickup.lon),
-                               (dropoff.lat, dropoff.lon)])
+    route = routing.get_route(
+        [(current.lat, current.lon), (pickup.lat, pickup.lon), (dropoff.lat, dropoff.lon)],
+        labels=[current.label, f"pickup: {pickup.label}", f"dropoff: {dropoff.label}"],
+    )
     legs = [Leg.from_route(leg.miles, leg.seconds, settings.TRUCK_MAX_AVG_SPEED_MPH)
             for leg in route.legs]
 
@@ -232,7 +248,10 @@ def plan_trip(current: Place, pickup: Place, dropoff: Place,
                 "distance_miles": round(r.miles, 1),
                 "router_duration_hours": round(r.seconds / 3600, 2),
                 "scheduled_driving_hours": _hours(leg.minutes),
-            } for (a, b), r, leg in zip(((current, pickup), (pickup, dropoff)), route.legs, legs)],
+                "steps": _steps_payload(r, start_mile=sum(l.miles for l in route.legs[:i]))
+                         if leg.miles else [],
+            } for i, ((a, b), r, leg) in enumerate(
+                zip(((current, pickup), (pickup, dropoff)), route.legs, legs))],
         },
         "stops": stops,
         "logs": logs,

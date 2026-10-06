@@ -1,12 +1,16 @@
+import { useState } from 'react'
 import {
-  CalendarDays, Clock, FileText, Gauge, Route, ShieldAlert, ShieldCheck, Timer, TriangleAlert,
+  CalendarDays, Clock, FileText, Gauge, ListOrdered, Route, ShieldAlert, ShieldCheck, Signpost,
+  Timer, TriangleAlert,
 } from 'lucide-react'
+import Directions from './Directions'
 import { CYCLE_LIMIT_HOURS, STOP_TYPES } from '../lib/constants'
 import { fmtDateTime, fmtDuration, fmtNumber } from '../lib/format'
 
-/** Stats, compliance badge, cycle usage and the stop-by-stop itinerary. */
+/** Stats, compliance badge, cycle usage, itinerary and turn-by-turn directions. */
 export default function TripSummary({ plan, stale, onFocusStop, onShowLogs }) {
   const s = plan.summary
+  const [tab, setTab] = useState('itinerary')
   return (
     <div className="space-y-4">
       {stale && (
@@ -51,12 +55,31 @@ export default function TripSummary({ plan, stale, onFocusStop, onShowLogs }) {
       </div>
 
       <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Itinerary</h3>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex rounded-lg bg-slate-200/70 p-0.5" role="tablist" aria-label="Trip details">
+            {[
+              ['itinerary', 'Itinerary', ListOrdered],
+              ['directions', 'Directions', Signpost],
+            ].map(([key, label, Icon]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                  tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Icon className="size-3.5" /> {label}
+              </button>
+            ))}
+          </div>
           <button type="button" onClick={onShowLogs} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
             <FileText className="size-3.5" /> View log sheets
           </button>
         </div>
+        {tab === 'directions' ? <Directions plan={plan} onFocus={onFocusStop} /> : (
         <ol className="relative space-y-1">
           {plan.stops.map((stop, i) => {
             const { Icon, color, label } = STOP_TYPES[stop.type]
@@ -86,6 +109,7 @@ export default function TripSummary({ plan, stale, onFocusStop, onShowLogs }) {
             )
           })}
         </ol>
+        )}
       </section>
     </div>
   )

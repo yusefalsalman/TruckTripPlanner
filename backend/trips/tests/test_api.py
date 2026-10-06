@@ -5,16 +5,19 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from trips.models import TripPlan
-from trips.services.routing import Route, RouteLeg, _build_cumulative
+from trips.services.routing import Route, RouteLeg, RouteStep, _build_cumulative, _build_steps
 
 DALLAS = (32.7767, -96.7970)
 OKC = (35.4676, -97.5164)
 DENVER = (39.7392, -104.9903)
 
 
-def fake_route(waypoints):
+def fake_route(waypoints, labels=None):
     coords = [tuple(w) for w in waypoints]
-    legs = [RouteLeg(miles=206.0, seconds=3 * 3600), RouteLeg(miles=620.0, seconds=9 * 3600)]
+    steps = [RouteStep("Head north on I-35", "I-35", "depart", "", 206.0, 3 * 3600, *coords[0]),
+             RouteStep("Arrive at pickup", "", "arrive", "", 0.0, 0, *coords[1])]
+    legs = [RouteLeg(miles=206.0, seconds=3 * 3600, steps=steps),
+            RouteLeg(miles=620.0, seconds=9 * 3600)]
     return Route(legs=legs, coordinates=coords,
                  cumulative_miles=_build_cumulative(coords, legs, coords))
 
@@ -56,6 +59,12 @@ class PlanTripApiTests(TestCase):
         detail = self.client.get(f"/api/trips/{body['id']}/")
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["summary"], body["summary"])
+
+    def test_directions_included_with_mile_markers(self, *_):
+        body = self.client.post("/api/plan-trip/", self.payload, format="json").json()
+        steps = body["route"]["legs"][0]["steps"]
+        self.assertEqual([s["instruction"] for s in steps], ["Head north on I-35", "Arrive at pickup"])
+        self.assertEqual([s["mile"] for s in steps], [0.0, 206.0])
 
     def test_recap_accumulates_cycle(self, *_):
         body = self.client.post("/api/plan-trip/", self.payload, format="json").json()
@@ -126,3 +135,63 @@ class MiscEndpointTests(TestCase):
     def test_search(self, _):
         resp = self.client.get("/api/geocode/search/?q=Dallas")
         self.assertEqual(resp.json()["results"][0]["label"], "X")
+
+
+def _osrm_step(kind, modifier="", name="", ref="", meters=1609.344, **extra):
+    maneuver = {"type": kind, "location": [-97.0, 35.0], **extra.pop("maneuver", {})}
+    if modifier:
+        maneuver["modifier"] = modifier
+    return {"maneuver": maneuver, "name": name, "ref": ref, "distance": meters, "duration": 60, **extra}
+
+
+class InstructionTests(TestCase):
+    def texts(self, raw):
+        return [s.instruction for s in _build_steps(raw, "dropoff: Denver, CO")]
+
+    def test_common_maneuvers(self):
+        raw = [
+            _osrm_step("depart", name="Main Street", maneuver={"bearing_after": 0}),
+            _osrm_step("turn", "left", name="Elm Street"),
+            _osrm_step("on ramp", "slight right", ref="I 35"),
+            _osrm_step("fork", "slight left", name="Interstate 35", ref="I 35"),
+            _osrm_step("off ramp", "right", exits="214A", destinations="I 35E North, Downtown"),
+            _osrm_step("roundabout", "right", name="Oak Avenue", maneuver={"exit": 2}),
+            _osrm_step("end of road", "sharp right", name="Pine Road"),
+            _osrm_step("arrive", meters=0),
+        ]
+        self.assertEqual(self.texts(raw), [
+            "Head north on Main Street",
+            "Turn left onto Elm Street",
+            "Take the ramp onto I-35",
+            "Keep left at the fork onto Interstate 35 (I-35)",
+            "Take exit 214A toward I-35E North, Downtown",
+            "At the roundabout, take the 2nd exit onto Oak Avenue",
+            "Turn right at the end of the road onto Pine Road",
+            "Arrive at dropoff: Denver, CO",
+        ])
+
+    def test_same_road_continuations_are_merged(self):
+        raw = [
+            _osrm_step("depart", name="I 40", maneuver={"bearing_after": 90}),
+            _osrm_step("new name", name="I 40"),
+            _osrm_step("continue", "straight", name="I 40"),
+            _osrm_step("new name", name="Route 66"),
+        ]
+        steps = _build_steps(raw, "x")
+        self.assertEqual([s.instruction for s in steps], ["Head east on I 40", "Continue onto Route 66"])
+        self.assertAlmostEqual(steps[0].miles, 3.0)
+
+    def test_renamed_stretches_of_same_highway_are_merged(self):
+        raw = [
+            _osrm_step("depart", name="Main St", maneuver={"bearing_after": 180}),
+            _osrm_step("merge", "right", name="Stemmons Fwy", ref="I 35E"),
+            _osrm_step("new name", name="Veterans Memorial Hwy", ref="I 35E;US 77"),
+            _osrm_step("new name", name="Kansas Turnpike", ref="I 35"),
+        ]
+        steps = _build_steps(raw, "x")
+        self.assertEqual([s.instruction for s in steps], [
+            "Head south on Main St",
+            "Merge right onto Stemmons Fwy (I-35E)",
+            "Continue onto Kansas Turnpike (I-35)",
+        ])
+        self.assertAlmostEqual(steps[1].miles, 2.0)
